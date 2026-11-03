@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where should we send it?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  /* Re-theme the whole page by changing these six colours */
+  :root {
+    --bg: #ffd84d;        /* page */
+    --card: #fffdf6;      /* form surface */
+    --ink: #17246b;       /* text, borders, shadow */
+    --muted: #4a5490;
+    --accent: #2745ff;    /* button */
+    --on-accent: #ffffff;
+    --error: #c4210f;
+    --ok: #117a3f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12163a; --card: #1d2252; --ink: #f4f1ff; --muted: #aeb4e6;
+      --accent: #ffd84d; --on-accent: #17246b; --error: #ff9a8f; --ok: #7ee3a5;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    padding: 32px 16px; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  .card {
+    position: relative; width: 100%; max-width: 460px; padding: 32px 28px 28px;
+    background: var(--card); border: 3px solid var(--ink); border-radius: 18px;
+    box-shadow: 8px 8px 0 var(--ink);
+  }
+
+  h1 {
+    margin: 0 0 6px; font-size: clamp(1.9rem, 7vw, 2.4rem);
+    font-weight: 800; line-height: 1.05; letter-spacing: -0.02em;
+  }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 420px) { .row { grid-template-columns: 1fr; gap: 0; } }
+
+  label { display: block; margin-bottom: 14px; font-size: .92rem; font-weight: 600; }
+  input {
+    display: block; width: 100%; margin-top: 5px; padding: 11px 13px;
+    font: inherit; font-weight: 400; color: var(--ink); background: var(--card);
+    border: 2px solid var(--ink); border-radius: 10px;
+    transition: box-shadow .12s ease, transform .12s ease;
+  }
+  input::placeholder { color: var(--muted); opacity: .6; }
+  input:focus { outline: none; box-shadow: 4px 4px 0 var(--accent); transform: translate(-2px, -2px); }
+  input:user-invalid { border-color: var(--error); }
+
+  .note { margin: 4px 0 18px; font-size: .85rem; color: var(--muted); }
+
+  button {
+    width: 100%; padding: 14px; font: inherit; font-size: 1.05rem; font-weight: 800;
+    color: var(--on-accent); background: var(--accent);
+    border: 3px solid var(--ink); border-radius: 12px; cursor: pointer;
+    box-shadow: 4px 4px 0 var(--ink);
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  button:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+  button:active:not(:disabled) { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--ink); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .loc { margin-bottom: 4px; }
+  button.secondary {
+    margin-bottom: 14px; padding: 11px; font-size: .98rem;
+    color: var(--ink); background: var(--card); box-shadow: 3px 3px 0 var(--ink);
+  }
+  input[readonly] { background: transparent; border-style: dashed; cursor: default; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+  #msg { min-height: 1.4em; margin: 14px 0 0; font-size: .92rem; font-weight: 600; }
+  #msg.error { color: var(--error); }
+
+  /* Success state */
+  .thanks { display: none; text-align: center; padding: 8px 0 4px; }
+  .done form { display: none; }
+  .done .thanks { display: block; }
+  .stamp {
+    display: grid; place-items: center; width: 84px; height: 84px; margin: 0 auto 16px;
+    font-size: 2.4rem; font-weight: 800; color: var(--on-accent); background: var(--accent);
+    border: 3px solid var(--ink); border-radius: 50%; box-shadow: 4px 4px 0 var(--ink);
+    animation: stamp .45s cubic-bezier(.3, 1.6, .5, 1) both;
+  }
+  @keyframes stamp { from { transform: scale(2.2) rotate(-24deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  .thanks h2 { margin: 0 0 6px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.01em; }
+  .thanks p { margin: 0 0 18px; color: var(--muted); }
+  .thanks a { color: var(--ink); font-weight: 600; cursor: pointer; }
+
+  .hp { position: absolute; left: -9999px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<main class="card" id="card">
+  <h1>Where should we send it?</h1>
+  <p class="sub">Pop in your details and we&rsquo;ll get your order moving.</p>
+
+  <form id="details" action="submit.php" method="post" novalidate>
+    <div class="row">
+      <label>First name
+        <input name="first_name" autocomplete="given-name" required maxlength="60">
+      </label>
+      <label>Surname
+        <input name="surname" autocomplete="family-name" required maxlength="60">
+      </label>
+    </div>
+
+    <div class="loc">
+      <button type="button" id="locate" class="secondary">Use my location</button>
+      <label>Delivery address
+        <input id="address" readonly tabindex="-1" placeholder="Fills in from your location">
+      </label>
+    </div>
+
+    <!-- Honeypot: real people never see or fill this -->
+    <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <!-- Filled in by the script once the browser shares the location -->
+    <input type="hidden" name="lat">
+    <input type="hidden" name="lng">
+    <input type="hidden" name="accuracy">
+
+    <p class="note">Tap &ldquo;Use my location&rdquo; and allow the browser prompt. Your address fills in from that, so it can&rsquo;t be typed in.</p>
+
+    <button type="submit" id="send" disabled>Send it my way</button>
+    <p id="msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <section class="thanks" aria-live="polite">
+    <div class="stamp" aria-hidden="true">&#10003;</div>
+    <h2>Got it, thank you!</h2>
+    <p>Your delivery details are in.</p>
+    <a id="again" tabindex="0" role="button">Enter different details</a>
+  </section>
+</main>
+
+<script>
+const card   = document.getElementById('card');
+const form   = document.getElementById('details');
+const msg    = document.getElementById('msg');
+const send   = document.getElementById('send');
+const locate = document.getElementById('locate');
+const addr   = document.getElementById('address');
+let located  = false;
+const SERVER_HINT = 'Can\u2019t reach submit.php. Open this page from your website or a PHP server (not by double-clicking the file), and make sure both files are in the same folder.';
+
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      return reject(new Error('This browser can\u2019t share location. Try Chrome, Safari or Firefox.'));
+    }
+    navigator.geolocation.getCurrentPosition(resolve, (err) => {
+      const reasons = {
+        1: 'Location is blocked. Allow location for this site in your browser settings, then try again.',
+        2: 'We couldn\u2019t work out your location. Check your signal or GPS and try again.',
+        3: 'Finding your location took too long. Please try again.'
+      };
+      reject(new Error(reasons[err.code] || 'Location check failed.'));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  });
+}
+
+// Step 1: the browser's own permission prompt, then the address is looked up from the pin
+locate.addEventListener('click', async () => {
+  msg.className = ''; msg.textContent = '';
+  locate.disabled = true;
+  locate.textContent = 'Finding you\u2026';
+  try {
+    const pos = await getLocation();
+    form.lat.value      = pos.coords.latitude;
+    form.lng.value      = pos.coords.longitude;
+    form.accuracy.value = Math.round(pos.coords.accuracy);
+
+    let address = '';
+    let serverReached = true;
+    try {
+      const body = new FormData();
+      body.append('action', 'lookup');
+      body.append('lat', form.lat.value);
+      body.append('lng', form.lng.value);
+      const res  = await fetch(form.action, { method: 'POST', body });
+      const data = await res.json();
+      if (data.ok) address = data.address;
+    } catch (_) { serverReached = false; }
+
+    addr.value = address || 'Location saved (no street address found)';
+    located = true;
+    send.disabled = false;
+    locate.textContent = 'Update my location';
+    if (!serverReached) { msg.className = 'error'; msg.textContent = SERVER_HINT; }
+  } catch (err) {
+    msg.className = 'error';
+    msg.textContent = err.message;
+    locate.textContent = located ? 'Update my location' : 'Use my location';
+  } finally {
+    locate.disabled = false;
+  }
+});
+
+// Step 2: send name, surname and the coordinates (the server works out the address itself)
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  msg.className = ''; msg.textContent = '';
+
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  if (!located) {
+    msg.className = 'error';
+    msg.textContent = 'Share your location first.';
+    return;
+  }
+
+  send.disabled = true;
+  send.textContent = 'Sending\u2026';
+  try {
+    const res  = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+
+    form.reset();
+    addr.value = '';
+    located = false;
+    locate.textContent = 'Use my location';
+    card.classList.add('done');
+  } catch (err) {
+    msg.className = 'error';
+    msg.textContent = (err instanceof TypeError || err instanceof SyntaxError) ? SERVER_HINT : err.message;
+    send.disabled = false;
+  } finally {
+    send.textContent = 'Send it my way';
+    if (!located) send.disabled = true;
+  }
+});
+
+const again = document.getElementById('again');
+const reopen = () => { card.classList.remove('done'); form.first_name.focus(); };
+again.addEventListener('click', reopen);
+again.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reopen(); } });
+</script>
+</body>
+</html>
