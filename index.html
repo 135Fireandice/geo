@@ -210,6 +210,21 @@ const SERVER_HINT = configured
   ? 'Can\u2019t reach the order server. Check your connection and try again.'
   : 'Add your Google Script link to SCRIPT_URL in this file first.';
 
+// Talks to the Google script with a <script> tag (JSONP). A normal fetch() is blocked by CORS.
+function callScript(params) {
+  return new Promise((resolve, reject) => {
+    if (!configured) return reject(new TypeError('not configured'));
+    const cb = '__cb' + Date.now() + Math.floor(Math.random() * 1e6);
+    const s  = document.createElement('script');
+    const cleanup = () => { clearTimeout(timer); delete window[cb]; s.remove(); };
+    const timer = setTimeout(() => { cleanup(); reject(new TypeError('timeout')); }, 20000);
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    s.onerror = () => { cleanup(); reject(new TypeError('network')); };
+    s.src = SCRIPT_URL + '?' + new URLSearchParams({ ...params, callback: cb });
+    document.head.appendChild(s);
+  });
+}
+
 function getLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -240,10 +255,7 @@ locate.addEventListener('click', async () => {
     let address = '';
     let serverReached = true;
     try {
-      if (!configured) throw new TypeError('not configured');
-      const body = new URLSearchParams({ action: 'lookup', lat: form.lat.value, lng: form.lng.value });
-      const res  = await fetch(SCRIPT_URL, { method: 'POST', body });
-      const data = await res.json();
+      const data = await callScript({ action: 'lookup', lat: form.lat.value, lng: form.lng.value });
       if (data.ok) address = data.address;
     } catch (_) { serverReached = false; }
 
@@ -276,10 +288,8 @@ form.addEventListener('submit', async (e) => {
   send.disabled = true;
   send.textContent = 'Sending\u2026';
   try {
-    if (!configured) throw new TypeError('not configured');
-    const res  = await fetch(SCRIPT_URL, { method: 'POST', body: new URLSearchParams(new FormData(form)) });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+    const data = await callScript(Object.fromEntries(new FormData(form)));
+    if (!data.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
 
     form.reset();
     addr.value = '';
