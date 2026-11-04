@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where should we send it?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;1,800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Re-theme by changing these colours. Background image: bg.jpg (same folder) */
+  :root {
+    --lime: #c8f400;
+    --black: #0c0c0d;
+    --panel: #131315;
+    --field: #1d1d20;
+    --line: #3b3b40;
+    --text: #f3f3ee;
+    --muted: #9b9b94;
+    --error: #ff6b5e;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    padding: 32px 16px; color: var(--text);
+    font: 16px/1.5 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:
+      linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,.18)),
+      url("bg.jpg") center top / 1222px 1960px repeat,
+      var(--black);
+  }
+
+  /* 3D background layer (bg.jpg above stays as the fallback if WebGL isn't available) */
+  #bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.5) 100%);
+  }
+
+  /* Card: lime outline with sliced corners, echoing the shards in the background */
+  .wrap { position: relative; z-index: 1; width: 100%; max-width: 460px; filter: drop-shadow(0 18px 28px rgba(0,0,0,.65)); }
+  .card {
+    padding: 3px; background: var(--lime);
+    clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px));
+  }
+  .inner {
+    padding: 34px 28px 30px; background: var(--panel);
+    clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));
+  }
+
+  h1, .thanks h2 {
+    margin: 0 0 8px; font: italic 800 clamp(2.3rem, 10vw, 3.1rem)/.92 "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    text-transform: uppercase; letter-spacing: .01em;
+  }
+  h1 span { color: var(--lime); }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 420px) { .row { grid-template-columns: 1fr; gap: 0; } }
+
+  label {
+    display: block; margin-bottom: 14px; font-size: .78rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+  }
+  input {
+    display: block; width: 100%; margin-top: 6px; padding: 12px 14px;
+    font: 400 1rem "Barlow", system-ui, sans-serif; letter-spacing: 0; text-transform: none;
+    color: var(--text); background: var(--field);
+    border: 2px solid var(--line); border-radius: 2px;
+    transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  input::placeholder { color: var(--muted); opacity: .6; }
+  input:focus { outline: none; border-color: var(--lime); background: #232327; box-shadow: inset 4px 0 0 var(--lime); }
+  input:user-invalid { border-color: var(--error); }
+  input[readonly] { border-style: dashed; color: var(--lime); background: transparent; cursor: default; }
+
+  .note { margin: 4px 0 18px; padding-left: 10px; border-left: 3px solid var(--lime); font-size: .85rem; color: var(--muted); }
+
+  /* Buttons: slanted like a racing stripe */
+  button {
+    display: block; width: 100%; padding: 15px 14px; border: 0; cursor: pointer;
+    font: italic 800 1.3rem/1 "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--black); background: var(--lime);
+    clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    transition: filter .12s ease, transform .1s ease;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+  button:active:not(:disabled) { transform: translateY(2px); }
+  button:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--black), inset 0 0 0 5px #fff; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.secondary {
+    margin-bottom: 14px; padding: 12px 14px; font-size: 1.1rem;
+    color: var(--lime); background: var(--field); box-shadow: inset 0 -3px 0 var(--lime);
+  }
+  button.secondary:focus-visible { box-shadow: inset 0 0 0 2px var(--lime); }
+
+  #msg { min-height: 1.4em; margin: 14px 0 0; font-size: .92rem; font-weight: 600; }
+  #msg.error { color: var(--error); }
+
+  /* Success state */
+  .thanks { display: none; text-align: center; padding: 8px 0 4px; }
+  .done form { display: none; }
+  .done .thanks { display: block; }
+  .stamp {
+    display: grid; place-items: center; width: 92px; height: 92px; margin: 0 auto 18px;
+    font-size: 2.6rem; font-weight: 800; color: var(--black); background: var(--lime);
+    clip-path: polygon(18% 0, 100% 10%, 82% 100%, 0 90%);
+    animation: slam .45s cubic-bezier(.3, 1.6, .5, 1) both;
+  }
+  @keyframes slam { from { transform: scale(2.4) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  .thanks p { margin: 0 0 18px; color: var(--muted); }
+  .thanks a { color: var(--lime); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .thanks a:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+
+  /* Custom cursor: lime diamond + targeting brackets that lock onto buttons and fields.
+     Only switched on for mouse users; touch screens and keyboard users are untouched. */
+  @media (hover: hover) and (pointer: fine) {
+    html.has-cursor, html.has-cursor * { cursor: none !important; }
+  }
+  #cur-dot, #cur-ret {
+    position: fixed; left: 0; top: 0; z-index: 9999; pointer-events: none;
+    opacity: 0; transition: opacity .15s ease;
+  }
+  html.has-cursor #cur-dot, html.has-cursor #cur-ret { opacity: 1; }
+  #cur-dot { width: 10px; height: 10px; margin: -5px 0 0 -5px; background: var(--lime); border: 2px solid var(--black); }
+  #cur-ret { width: 36px; height: 36px; transition: opacity .15s ease, filter .2s ease; }
+  #cur-ret i { position: absolute; width: 10px; height: 10px; border: 0 solid var(--lime); transition: border-color .15s ease; }
+  #cur-ret i:nth-child(1) { left: 0;  top: 0;    border-width: 2px 0 0 2px; }
+  #cur-ret i:nth-child(2) { right: 0; top: 0;    border-width: 2px 2px 0 0; }
+  #cur-ret i:nth-child(3) { left: 0;  bottom: 0; border-width: 0 0 2px 2px; }
+  #cur-ret i:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; }
+  #cur-ret.lock   { filter: drop-shadow(0 0 5px rgba(200, 244, 0, .85)); }
+  #cur-ret.denied i { border-color: var(--error); }
+  .spark { position: fixed; left: 0; top: 0; z-index: 9999; width: 2px; height: 12px; pointer-events: none; }
+
+  .hp { position: absolute; left: -9999px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg" aria-hidden="true"></canvas>
+<div id="cur-dot" aria-hidden="true"></div>
+<div id="cur-ret" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+<div class="wrap">
+<main class="card" id="card">
+<div class="inner">
+  <h1>Where should we <span>send it?</span></h1>
+  <p class="sub">Drop your details and we&rsquo;ll get your order moving.</p>
+
+  <form id="details" novalidate>
+    <div class="row">
+      <label>First name
+        <input name="first_name" autocomplete="given-name" required maxlength="60">
+      </label>
+      <label>Surname
+        <input name="surname" autocomplete="family-name" required maxlength="60">
+      </label>
+    </div>
+
+    <div class="loc">
+      <button type="button" id="locate" class="secondary">Use my location</button>
+      <label>Delivery address
+        <input id="address" readonly tabindex="-1" placeholder="Fills in from your location">
+      </label>
+    </div>
+
+    <!-- Honeypot: real people never see or fill this -->
+    <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <!-- Filled in by the script once the browser shares the location -->
+    <input type="hidden" name="lat">
+    <input type="hidden" name="lng">
+    <input type="hidden" name="accuracy">
+
+    <p class="note">Tap &ldquo;Use my location&rdquo; and allow the browser prompt. Your address fills in from that, so it can&rsquo;t be typed in.</p>
+
+    <button type="submit" id="send" disabled>Send it my way</button>
+    <p id="msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <section class="thanks" aria-live="polite">
+    <div class="stamp" aria-hidden="true">&#10003;</div>
+    <h2>Got it, <span style="color:var(--lime)">thank you!</span></h2>
+    <p>Your delivery details are in.</p>
+    <a id="again" tabindex="0" role="button">Enter different details</a>
+  </section>
+</div>
+</main>
+</div>
+
+<script>
+const card   = document.getElementById('card');
+const form   = document.getElementById('details');
+const msg    = document.getElementById('msg');
+const send   = document.getElementById('send');
+const locate = document.getElementById('locate');
+const addr   = document.getElementById('address');
+let located  = false;
+// Paste the Web app URL you get from Google Apps Script here (ends in /exec)
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkxdDdkrHEvauTvlzupx3XDjeHu45eTI5FpS30cCv8caoq3JBYojX7CxMNn39UbJKI/exec';
+const configured = !SCRIPT_URL.startsWith('PASTE');
+const SERVER_HINT = configured
+  ? 'Can\u2019t reach the order server. Check your connection and try again.'
+  : 'Add your Google Script link to SCRIPT_URL in this file first.';
+
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      return reject(new Error('This browser can\u2019t share location. Try Chrome, Safari or Firefox.'));
+    }
+    navigator.geolocation.getCurrentPosition(resolve, (err) => {
+      const reasons = {
+        1: 'Location is blocked. Allow location for this site in your browser settings, then try again.',
+        2: 'We couldn\u2019t work out your location. Check your signal or GPS and try again.',
+        3: 'Finding your location took too long. Please try again.'
+      };
+      reject(new Error(reasons[err.code] || 'Location check failed.'));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  });
+}
+
+// Step 1: the browser's own permission prompt, then the address is looked up from the pin
+locate.addEventListener('click', async () => {
+  msg.className = ''; msg.textContent = '';
+  locate.disabled = true;
+  locate.textContent = 'Finding you\u2026';
+  try {
+    const pos = await getLocation();
+    form.lat.value      = pos.coords.latitude;
+    form.lng.value      = pos.coords.longitude;
+    form.accuracy.value = Math.round(pos.coords.accuracy);
+
+    let address = '';
+    let serverReached = true;
+    try {
+      if (!configured) throw new TypeError('not configured');
+      const body = new URLSearchParams({ action: 'lookup', lat: form.lat.value, lng: form.lng.value });
+      const res  = await fetch(SCRIPT_URL, { method: 'POST', body });
+      const data = await res.json();
+      if (data.ok) address = data.address;
+    } catch (_) { serverReached = false; }
+
+    addr.value = address || 'Location saved (no street address found)';
+    located = true;
+    send.disabled = false;
+    locate.textContent = 'Update my location';
+    if (!serverReached) { msg.className = 'error'; msg.textContent = SERVER_HINT; }
+  } catch (err) {
+    msg.className = 'error';
+    msg.textContent = err.message;
+    locate.textContent = located ? 'Update my location' : 'Use my location';
+  } finally {
+    locate.disabled = false;
+  }
+});
+
+// Step 2: send name, surname and the coordinates (the server works out the address itself)
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  msg.className = ''; msg.textContent = '';
+
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  if (!located) {
+    msg.className = 'error';
+    msg.textContent = 'Share your location first.';
+    return;
+  }
+
+  send.disabled = true;
+  send.textContent = 'Sending\u2026';
+  try {
+    if (!configured) throw new TypeError('not configured');
+    const res  = await fetch(SCRIPT_URL, { method: 'POST', body: new URLSearchParams(new FormData(form)) });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+
+    form.reset();
+    addr.value = '';
+    located = false;
+    locate.textContent = 'Use my location';
+    card.classList.add('done');
+  } catch (err) {
+    msg.className = 'error';
+    msg.textContent = (err instanceof TypeError || err instanceof SyntaxError) ? SERVER_HINT : err.message;
+    send.disabled = false;
+  } finally {
+    send.textContent = 'Send it my way';
+    if (!located) send.disabled = true;
+  }
+});
+
+const again = document.getElementById('again');
+const reopen = () => { card.classList.remove('done'); form.first_name.focus(); };
+again.addEventListener('click', reopen);
+again.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reopen(); } });
+</script>
+<!-- three.js (pinned version). For offline/own hosting, download it and point src at your copy. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Floating neon shards you fly through. Falls back to bg.jpg if WebGL or three.js is unavailable.
+(function () {
+  const canvas = document.getElementById('bg');
+  if (!window.THREE || !canvas) { if (canvas) canvas.remove(); return; }
+
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); }
+  catch (e) { canvas.remove(); return; }
+
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x08080a, 1);
+
+  const scene  = new THREE.Scene();
+  scene.fog    = new THREE.Fog(0x08080a, 26, 78);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+  camera.position.set(0, 0, 18);
+
+  // Lights: dim base, a cool key light, and a lime light that follows the pointer
+  scene.add(new THREE.AmbientLight(0x8a8a94, 1.1));
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);
+  key.position.set(6, 10, 8);
+  scene.add(key);
+  const glow = new THREE.PointLight(0xc8f400, 1.8, 45, 1.5);
+  glow.position.set(0, 0, 6);
+  scene.add(glow);
+
+  // Materials: lime, charcoal, black
+  const lime = new THREE.MeshStandardMaterial({ color: 0xc8f400, emissive: 0x8aaa00, roughness: .45, metalness: .2, flatShading: true, side: THREE.DoubleSide });
+  const grey = new THREE.MeshStandardMaterial({ color: 0x35353b, roughness: .6, metalness: .3, flatShading: true, side: THREE.DoubleSide });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: .5, metalness: .5, flatShading: true, side: THREE.DoubleSide });
+  const edge = new THREE.LineBasicMaterial({ color: 0xc8f400, transparent: true, opacity: .7 });
+
+  // Shard shapes: long needles, flat glass fragments, chunky splinters
+  const needle = () => new THREE.ConeGeometry(rand(.08, .28), rand(3, 9), 4);
+  const glass = () => {
+    const s = new THREE.Shape();
+    const n = Math.random() < .4 ? 4 : 3;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rand(-.5, .5);
+      const r = rand(1.2, 4.2) * (i % 2 ? .45 : 1);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r * rand(.4, 1);
+      i ? s.lineTo(x, y) : s.moveTo(x, y);
+    }
+    return new THREE.ExtrudeGeometry(s, { depth: rand(.04, .14), bevelEnabled: false });
+  };
+  const chunk = () => {
+    const g = new THREE.TetrahedronGeometry(rand(.5, 1.4));
+    g.scale(rand(.5, 1.4), rand(1, 3), rand(.5, 1.4));
+    return g;
+  };
+
+  const shards = [];
+  const COUNT = innerWidth < 700 ? 110 : 200;
+  for (let i = 0; i < COUNT; i++) {
+    const t = Math.random(), c = Math.random();
+    const geo = t < .4 ? needle() : t < .8 ? glass() : chunk();
+    const mat = c < .5 ? lime : c < .8 ? grey : dark;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(rand(-22, 22), rand(-13, 13), rand(-40, 10));
+    mesh.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
+    mesh.userData = {
+      spin: new THREE.Vector3(rand(-.3, .3), rand(-.3, .3), rand(-.3, .3)),
+      baseY: mesh.position.y, bob: rand(0, 6.28), speed: rand(.15, .5), fly: rand(1, 2.4)
+    };
+    if (mat !== lime && Math.random() < .5) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edge));
+    scene.add(mesh);
+    shards.push(mesh);
+  }
+
+  // Pointer parallax (works for touch too)
+  let mx = 0, my = 0;
+  addEventListener('pointermove', (e) => {
+    mx = (e.clientX / innerWidth) * 2 - 1;
+    my = -((e.clientY / innerHeight) * 2 - 1);
+  }, { passive: true });
+
+  function resize() {
+    renderer.setSize(innerWidth, innerHeight, false);
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    if (reduceMotion) renderer.render(scene, camera);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  if (reduceMotion) return; // one still frame, no animation
+
+  const clock = new THREE.Clock();
+  (function loop() {
+    requestAnimationFrame(loop);
+    const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+
+    for (const m of shards) {
+      const u = m.userData;
+      m.rotation.x += u.spin.x * dt;
+      m.rotation.y += u.spin.y * dt;
+      m.rotation.z += u.spin.z * dt;
+      m.position.y = u.baseY + Math.sin(t * u.speed + u.bob) * .8;
+      m.position.z += u.fly * dt;                 // drift toward the camera...
+      if (m.position.z > 14) {                    // ...then respawn far away
+        m.position.z = -40;
+        m.position.x = rand(-22, 22);
+        u.baseY = rand(-13, 13);
+      }
+    }
+
+    camera.position.x += (mx * 3 + Math.sin(t * .15) * 1.5 - camera.position.x) * .04;
+    camera.position.y += (my * 2 - camera.position.y) * .04;
+    camera.lookAt(0, 0, 0);
+    glow.position.set(mx * 14, my * 8, 6);
+
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
+
+<script>
+// Custom cursor (mouse only). Brackets glide to the pointer and snap around whatever you hover.
+(function () {
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const root = document.documentElement;
+  const dot = document.getElementById('cur-dot');
+  const ret = document.getElementById('cur-ret');
+  const SEL = 'button, a, input:not([type="hidden"]), [role="button"]';
+  const LIME = '#c8f400', RED = '#ff6b5e';
+
+  let mx = 0, my = 0, rx = 0, ry = 0, rw = 36, rh = 36;
+  let active = false, down = false, target = null;
+
+  addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    mx = e.clientX; my = e.clientY;
+    if (!active) { active = true; rx = mx; ry = my; root.classList.add('has-cursor'); }
+  }, { passive: true });
+
+  // Hide while the mouse is outside the window
+  root.addEventListener('mouseleave', () => { dot.style.opacity = 0; ret.style.opacity = 0; });
+  root.addEventListener('mouseenter', () => { dot.style.opacity = ''; ret.style.opacity = ''; });
+
+  // Click burst: little lime splinters (red if the thing is disabled)
+  function burst(color, n) {
+    if (reduce) return;
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement('div');
+      s.className = 'spark';
+      s.style.background = color;
+      document.body.appendChild(s);
+      const a = (i / n) * 360 + Math.random() * 30;
+      const d = 28 + Math.random() * 30;
+      const base = `translate3d(${mx}px, ${my}px, 0) rotate(${a}deg)`;
+      s.animate(
+        [{ transform: base + ' translateY(-6px)', opacity: 1 },
+         { transform: base + ` translateY(-${d}px) scaleY(.3)`, opacity: 0 }],
+        { duration: 420 + Math.random() * 150, easing: 'cubic-bezier(.2,.7,.3,1)' }
+      ).onfinish = () => s.remove();
+    }
+  }
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    down = true;
+    burst(target && target.disabled ? RED : LIME, target && target.disabled ? 5 : 9);
+  });
+  addEventListener('pointerup', () => { down = false; });
+  addEventListener('blur', () => { down = false; });
+
+  (function frame() {
+    requestAnimationFrame(frame);
+    if (!active) return;
+
+    // Works on disabled buttons too, which don't fire pointer events
+    const el = document.elementFromPoint(mx, my);
+    const t = el && el.closest ? el.closest(SEL) : null;
+    target = t && !t.classList.contains('hp') ? t : null;
+    ret.classList.toggle('lock', !!target && !target.disabled);
+    ret.classList.toggle('denied', !!target && target.disabled);
+
+    let tx = mx, ty = my, tw = 36, th = 36;
+    if (target) {
+      const r = target.getBoundingClientRect();
+      tx = r.left + r.width / 2; ty = r.top + r.height / 2;
+      tw = r.width + 16; th = r.height + 16;
+    }
+    if (down) { tw *= .9; th *= .9; }
+
+    const k = reduce ? 1 : .22;
+    rx += (tx - rx) * k; ry += (ty - ry) * k;
+    rw += (tw - rw) * k; rh += (th - rh) * k;
+
+    ret.style.width  = rw + 'px';
+    ret.style.height = rh + 'px';
+    ret.style.transform = `translate3d(${rx - rw / 2}px, ${ry - rh / 2}px, 0)`;
+    dot.style.transform = `translate3d(${mx}px, ${my}px, 0) rotate(45deg)`;
+  })();
+})();
+</script>
+
+</body>
+</html>
